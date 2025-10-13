@@ -18,6 +18,8 @@ class GameScene extends Phaser.Scene {
     this.selectedTile = null;
     this.isSwapping = false;
     this.isProcessing = false;
+    this.gridSize = 6;
+    this.tileSize = 50;
   }
 
   preload() {
@@ -110,40 +112,38 @@ class GameScene extends Phaser.Scene {
   }
 
   createGrid() {
-    const gridSize = 5;
-    const tileSize = 60;
-    const offsetX = (400 - (gridSize * tileSize)) / 2;
-    const offsetY = 180;
+    const offsetX = (400 - (this.gridSize * this.tileSize)) / 2;
+    const offsetY = 150;
     
     // Clear existing grid
     this.grid = [];
     
-    for (let y = 0; y < gridSize; y++) {
+    for (let y = 0; y < this.gridSize; y++) {
       this.grid[y] = [];
-      for (let x = 0; x < gridSize; x++) {
+      for (let x = 0; x < this.gridSize; x++) {
         const randomItem = foodItems[Math.floor(Math.random() * foodItems.length)];
         
         // Create a container for the tile
         const tileContainer = this.add.container(
-          offsetX + x * tileSize + tileSize / 2,
-          offsetY + y * tileSize + tileSize / 2
+          offsetX + x * this.tileSize + this.tileSize / 2,
+          offsetY + y * this.tileSize + this.tileSize / 2
         );
-        
+
         // Create background for the tile (rounded rectangle)
-        const tileBg = this.add.rectangle(0, 0, tileSize - 4, tileSize - 4, randomItem.color);
+        const tileBg = this.add.rectangle(0, 0, this.tileSize - 4, this.tileSize - 4, randomItem.color);
         tileBg.setStrokeStyle(3, 0x000000);
         tileBg.setOrigin(0.5);
         
         // Add emoji icon
         const icon = this.add.text(0, 0, randomItem.icon, {
-          fontSize: '36px'
+          fontSize: '30px'
         }).setOrigin(0.5);
         
         // Add objects to container
         tileContainer.add([tileBg, icon]);
         
         // Make it interactive
-        tileContainer.setInteractive(new Phaser.Geom.Rectangle(-tileSize/2, -tileSize/2, tileSize, tileSize), Phaser.Geom.Rectangle.Contains);
+        tileContainer.setInteractive(new Phaser.Geom.Rectangle(-this.tileSize/2, -this.tileSize/2, this.tileSize, this.tileSize), Phaser.Geom.Rectangle.Contains);
         
         // Store position and item data
         tileContainer.gridX = x;
@@ -226,15 +226,14 @@ class GameScene extends Phaser.Scene {
     tile2.disableInteractive();
     
     // Calculate new positions
-    const tileSize = 60;
-    const offsetX = (400 - (5 * tileSize)) / 2;
-    const offsetY = 180;
-    
-    const newX1 = offsetX + tile2.gridX * tileSize + tileSize / 2;
-    const newY1 = offsetY + tile2.gridY * tileSize + tileSize / 2;
-    
-    const newX2 = offsetX + tile1.gridX * tileSize + tileSize / 2;
-    const newY2 = offsetY + tile1.gridY * tileSize + tileSize / 2;
+    const offsetX = (400 - (this.gridSize * this.tileSize)) / 2;
+    const offsetY = 150;
+
+    const newX1 = offsetX + tile2.gridX * this.tileSize + this.tileSize / 2;
+    const newY1 = offsetY + tile2.gridY * this.tileSize + this.tileSize / 2;
+
+    const newX2 = offsetX + tile1.gridX * this.tileSize + this.tileSize / 2;
+    const newY2 = offsetY + tile1.gridY * this.tileSize + this.tileSize / 2;
     
     // Update grid positions immediately before animation
     this.swapGridPositions(tile1, tile2);
@@ -274,17 +273,16 @@ class GameScene extends Phaser.Scene {
     // Disable interactivity during swap back
     tile1.disableInteractive();
     tile2.disableInteractive();
-    
+
     // Calculate original positions
-    const tileSize = 60;
-    const offsetX = (400 - (5 * tileSize)) / 2;
-    const offsetY = 180;
-    
-    const originalX1 = offsetX + originalPos1.x * tileSize + tileSize / 2;
-    const originalY1 = offsetY + originalPos1.y * tileSize + tileSize / 2;
-    
-    const originalX2 = offsetX + originalPos2.x * tileSize + tileSize / 2;
-    const originalY2 = offsetY + originalPos2.y * tileSize + tileSize / 2;
+    const offsetX = (400 - (this.gridSize * this.tileSize)) / 2;
+    const offsetY = 150;
+
+    const originalX1 = offsetX + originalPos1.x * this.tileSize + this.tileSize / 2;
+    const originalY1 = offsetY + originalPos1.y * this.tileSize + this.tileSize / 2;
+
+    const originalX2 = offsetX + originalPos2.x * this.tileSize + this.tileSize / 2;
+    const originalY2 = offsetY + originalPos2.y * this.tileSize + this.tileSize / 2;
     
     // Animate swap back
     const tween1 = this.tweens.add({
@@ -333,10 +331,10 @@ class GameScene extends Phaser.Scene {
 
   findAllMatches() {
     let matches = [];
-    
+
     // Check horizontal matches
-    for (let y = 0; y < 5; y++) {
-      for (let x = 0; x < 3; x++) {
+    for (let y = 0; y < this.gridSize; y++) {
+      for (let x = 0; x < this.gridSize - 2; x++) {
         const tile1 = this.grid[y][x];
         // Skip if tile1 is null
         if (!tile1) continue;
@@ -355,7 +353,7 @@ class GameScene extends Phaser.Scene {
           let matchTiles = [tile1, tile2, tile3];
           
           // Check for longer matches
-          for (let i = x + 3; i < 5; i++) {
+          for (let i = x + 3; i < this.gridSize; i++) {
             const nextTile = this.grid[y][i];
             // Skip if nextTile is null
             if (!nextTile) break;
@@ -378,8 +376,8 @@ class GameScene extends Phaser.Scene {
     }
     
     // Check vertical matches
-    for (let x = 0; x < 5; x++) {
-      for (let y = 0; y < 3; y++) {
+    for (let x = 0; x < this.gridSize; x++) {
+      for (let y = 0; y < this.gridSize - 2; y++) {
         const tile1 = this.grid[y][x];
         // Skip if tile1 is null
         if (!tile1) continue;
@@ -398,7 +396,7 @@ class GameScene extends Phaser.Scene {
           let matchTiles = [tile1, tile2, tile3];
           
           // Check for longer matches
-          for (let i = y + 3; i < 5; i++) {
+          for (let i = y + 3; i < this.gridSize; i++) {
             const nextTile = this.grid[i][x];
             // Skip if nextTile is null
             if (!nextTile) break;
@@ -490,6 +488,7 @@ class GameScene extends Phaser.Scene {
           } else {
             this.isSwapping = false;
             this.isProcessing = false;
+            this.checkForPossibleMoves();
           }
         });
       });
@@ -497,13 +496,12 @@ class GameScene extends Phaser.Scene {
   }
 
   dropTiles() {
-    const tileSize = 60;
-    const offsetX = (400 - (5 * tileSize)) / 2;
-    const offsetY = 180;
+    const offsetX = (400 - (this.gridSize * this.tileSize)) / 2;
+    const offsetY = 150;
 
-    for (let x = 0; x < 5; x++) {
+    for (let x = 0; x < this.gridSize; x++) {
       const tilesInColumn = [];
-      for (let y = 4; y >= 0; y--) {
+      for (let y = this.gridSize - 1; y >= 0; y--) {
         if (this.grid[y] && this.grid[y][x]) {
           tilesInColumn.push(this.grid[y][x]);
           this.grid[y][x] = null;
@@ -512,14 +510,14 @@ class GameScene extends Phaser.Scene {
 
       for (let i = 0; i < tilesInColumn.length; i++) {
         const tile = tilesInColumn[i];
-        const targetY = 4 - i;
+        const targetY = this.gridSize - 1 - i;
 
         if (!this.grid[targetY]) this.grid[targetY] = [];
         this.grid[targetY][x] = tile;
         tile.gridY = targetY;
         tile.gridX = x;
 
-        const targetYPos = offsetY + targetY * tileSize + tileSize / 2;
+        const targetYPos = offsetY + targetY * this.tileSize + this.tileSize / 2;
 
         tile.disableInteractive();
 
@@ -537,36 +535,35 @@ class GameScene extends Phaser.Scene {
   }
 
   fillEmptySpaces() {
-    const tileSize = 60;
-    const offsetX = (400 - (5 * tileSize)) / 2;
-    const offsetY = 180;
+    const offsetX = (400 - (this.gridSize * this.tileSize)) / 2;
+    const offsetY = 150;
 
-    for (let y = 0; y < 5; y++) {
+    for (let y = 0; y < this.gridSize; y++) {
       if (!this.grid[y]) this.grid[y] = [];
 
-      for (let x = 0; x < 5; x++) {
+      for (let x = 0; x < this.gridSize; x++) {
         if (!this.grid[y][x]) {
           const randomItem = foodItems[Math.floor(Math.random() * foodItems.length)];
 
-          const startY = offsetY - (5 - y) * tileSize - 60;
+          const startY = offsetY - (this.gridSize - y) * this.tileSize - 60;
 
           const tileContainer = this.add.container(
-            offsetX + x * tileSize + tileSize / 2,
+            offsetX + x * this.tileSize + this.tileSize / 2,
             startY
           );
 
-          const tileBg = this.add.rectangle(0, 0, tileSize - 4, tileSize - 4, randomItem.color);
+          const tileBg = this.add.rectangle(0, 0, this.tileSize - 4, this.tileSize - 4, randomItem.color);
           tileBg.setStrokeStyle(3, 0x000000);
           tileBg.setOrigin(0.5);
 
           const icon = this.add.text(0, 0, randomItem.icon, {
-            fontSize: '36px'
+            fontSize: '30px'
           }).setOrigin(0.5);
 
           tileContainer.add([tileBg, icon]);
 
           tileContainer.setInteractive(
-            new Phaser.Geom.Rectangle(-tileSize/2, -tileSize/2, tileSize, tileSize),
+            new Phaser.Geom.Rectangle(-this.tileSize/2, -this.tileSize/2, this.tileSize, this.tileSize),
             Phaser.Geom.Rectangle.Contains
           );
 
@@ -581,7 +578,7 @@ class GameScene extends Phaser.Scene {
 
           this.grid[y][x] = tileContainer;
 
-          const targetY = offsetY + y * tileSize + tileSize / 2;
+          const targetY = offsetY + y * this.tileSize + this.tileSize / 2;
 
           tileContainer.disableInteractive();
 
@@ -599,6 +596,92 @@ class GameScene extends Phaser.Scene {
     }
   }
   
+  checkForPossibleMoves() {
+    for (let y = 0; y < this.gridSize; y++) {
+      for (let x = 0; x < this.gridSize; x++) {
+        const tile = this.grid[y][x];
+        if (!tile) continue;
+
+        if (x < this.gridSize - 1) {
+          const rightTile = this.grid[y][x + 1];
+          if (rightTile && this.wouldCreateMatch(tile, rightTile)) {
+            return true;
+          }
+        }
+
+        if (y < this.gridSize - 1) {
+          const downTile = this.grid[y + 1][x];
+          if (downTile && this.wouldCreateMatch(tile, downTile)) {
+            return true;
+          }
+        }
+      }
+    }
+
+    this.shuffleBoard();
+    return false;
+  }
+
+  wouldCreateMatch(tile1, tile2) {
+    this.swapGridPositions(tile1, tile2);
+    const matches = this.findAllMatches();
+    this.swapGridPositions(tile1, tile2);
+    return matches.length > 0;
+  }
+
+  shuffleBoard() {
+    const allTiles = [];
+    for (let y = 0; y < this.gridSize; y++) {
+      for (let x = 0; x < this.gridSize; x++) {
+        if (this.grid[y][x]) {
+          allTiles.push(this.grid[y][x]);
+        }
+      }
+    }
+
+    for (let i = allTiles.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const tempData = allTiles[i].itemData;
+      allTiles[i].itemData = allTiles[j].itemData;
+      allTiles[j].itemData = tempData;
+
+      allTiles[i].removeAll(true);
+      const tileBg1 = this.add.rectangle(0, 0, this.tileSize - 4, this.tileSize - 4, allTiles[i].itemData.color);
+      tileBg1.setStrokeStyle(3, 0x000000);
+      tileBg1.setOrigin(0.5);
+      const icon1 = this.add.text(0, 0, allTiles[i].itemData.icon, {
+        fontSize: '30px'
+      }).setOrigin(0.5);
+      allTiles[i].add([tileBg1, icon1]);
+      allTiles[i].bg = tileBg1;
+
+      allTiles[j].removeAll(true);
+      const tileBg2 = this.add.rectangle(0, 0, this.tileSize - 4, this.tileSize - 4, allTiles[j].itemData.color);
+      tileBg2.setStrokeStyle(3, 0x000000);
+      tileBg2.setOrigin(0.5);
+      const icon2 = this.add.text(0, 0, allTiles[j].itemData.icon, {
+        fontSize: '30px'
+      }).setOrigin(0.5);
+      allTiles[j].add([tileBg2, icon2]);
+      allTiles[j].bg = tileBg2;
+    }
+
+    this.removeInitialMatches();
+
+    const shuffleText = this.add.text(200, 300, 'No moves! Shuffling...', {
+      fontSize: '24px',
+      fill: '#ffffff',
+      backgroundColor: '#ff6600',
+      padding: { x: 20, y: 10 },
+      stroke: '#000000',
+      strokeThickness: 3
+    }).setOrigin(0.5).setDepth(2000);
+
+    this.time.delayedCall(1500, () => {
+      shuffleText.destroy();
+    });
+  }
+
   removeInitialMatches() {
     let matches = this.findAllMatches();
     
@@ -618,13 +701,12 @@ class GameScene extends Phaser.Scene {
         match.removeAll(true); // Remove all children
         
         // Recreate the tile with the new item
-        const tileSize = 60;
-        const tileBg = this.add.rectangle(0, 0, tileSize - 4, tileSize - 4, newItem.color);
+        const tileBg = this.add.rectangle(0, 0, this.tileSize - 4, this.tileSize - 4, newItem.color);
         tileBg.setStrokeStyle(3, 0x000000);
         tileBg.setOrigin(0.5);
         
         const icon = this.add.text(0, 0, newItem.icon, {
-          fontSize: '36px'
+          fontSize: '30px'
         }).setOrigin(0.5);
         
         match.add([tileBg, icon]);
