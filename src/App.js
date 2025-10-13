@@ -425,27 +425,23 @@ class GameScene extends Phaser.Scene {
 
   processMatches(matches) {
     this.isProcessing = true;
-    
+
     // Update score
     this.score += matches.length * 10;
     this.scoreText.setText('Score: ' + this.score);
-    
+
     // Show nutrition fact for one of the matched tiles with glass effect
     if (matches.length > 0) {
-      // Create glass effect background
       const glassBg = this.add.rectangle(200, 300, 350, 150, 0xffffff);
       glassBg.setAlpha(0.85);
       glassBg.setStrokeStyle(2, 0x000000);
-      
-      // Add a subtle shadow for glass effect
+
       const shadow = this.add.rectangle(205, 305, 350, 150, 0x000000);
       shadow.setAlpha(0.3);
       shadow.setDepth(1000);
-      
-      // Position glassBg in front of shadow
+
       glassBg.setDepth(1001);
-      
-      // Create the text
+
       const factText = this.add.text(200, 300, matches[0].itemData.fact, {
         fontSize: '20px',
         fill: '#000000',
@@ -453,15 +449,13 @@ class GameScene extends Phaser.Scene {
         align: 'center',
         fontStyle: 'bold'
       }).setOrigin(0.5);
-      
+
       factText.setDepth(1002);
-      
-      // Add a decorative border to the text
+
       const textBg = this.add.rectangle(200, 300, 310, 110, 0xffffff, 0);
       textBg.setStrokeStyle(1, 0x000000);
       textBg.setDepth(1001);
-      
-      // Remove after delay
+
       this.time.delayedCall(2500, () => {
         shadow.destroy();
         glassBg.destroy();
@@ -469,50 +463,36 @@ class GameScene extends Phaser.Scene {
         textBg.destroy();
       });
     }
-    
-    // Remove matched tiles
+
     matches.forEach(tile => {
-      // Animate removal with a bounce effect
+      this.grid[tile.gridY][tile.gridX] = null;
+
       this.tweens.add({
         targets: tile,
         scale: 0,
         alpha: 0,
-        duration: 500,
-        ease: 'Bounce.easeIn',
+        duration: 300,
+        ease: 'Power2',
         onComplete: () => {
           tile.destroy();
-          // Mark position as empty
-          this.grid[tile.gridY][tile.gridX] = null;
         }
       });
     });
-    
-    // After removal, drop tiles and fill gaps
-    this.time.delayedCall(600, () => {
-      if (this.dropTiles()) {
-        this.time.delayedCall(500, () => {
-          if (this.fillEmptySpaces()) {
-            this.time.delayedCall(500, () => {
-              // Check for new matches after a small delay to ensure animations complete
-              this.time.delayedCall(100, () => {
-                const newMatches = this.findAllMatches();
-                if (newMatches.length > 0) {
-                  this.processMatches(newMatches);
-                } else {
-                  this.isSwapping = false;
-                  this.isProcessing = false;
-                }
-              });
-            });
+
+    this.time.delayedCall(350, () => {
+      this.dropTiles();
+      this.time.delayedCall(450, () => {
+        this.fillEmptySpaces();
+        this.time.delayedCall(600, () => {
+          const newMatches = this.findAllMatches();
+          if (newMatches.length > 0) {
+            this.processMatches(newMatches);
           } else {
             this.isSwapping = false;
             this.isProcessing = false;
           }
         });
-      } else {
-        this.isSwapping = false;
-        this.isProcessing = false;
-      }
+      });
     });
   }
 
@@ -520,175 +500,103 @@ class GameScene extends Phaser.Scene {
     const tileSize = 60;
     const offsetX = (400 - (5 * tileSize)) / 2;
     const offsetY = 180;
-    let tilesDropped = false;
-    
-    // Process each column
+
     for (let x = 0; x < 5; x++) {
-      // First, find all non-empty tiles in this column (from bottom to top)
       const tilesInColumn = [];
       for (let y = 4; y >= 0; y--) {
         if (this.grid[y] && this.grid[y][x]) {
-          tilesInColumn.push({
-            tile: this.grid[y][x],
-            originalY: y
-          });
-        }
-      }
-      
-      // Clear the column (we'll rebuild it)
-      for (let y = 0; y < 5; y++) {
-        if (this.grid[y]) {
+          tilesInColumn.push(this.grid[y][x]);
           this.grid[y][x] = null;
         }
       }
-      
-      // Place tiles at the bottom of the column
-      tilesInColumn.forEach(({tile, originalY}, newY) => {
-        const targetY = 4 - newY; // Place from bottom up
-        
-        // Update grid position
+
+      for (let i = 0; i < tilesInColumn.length; i++) {
+        const tile = tilesInColumn[i];
+        const targetY = 4 - i;
+
         if (!this.grid[targetY]) this.grid[targetY] = [];
         this.grid[targetY][x] = tile;
         tile.gridY = targetY;
-        
-        // Calculate new position
+        tile.gridX = x;
+
         const targetYPos = offsetY + targetY * tileSize + tileSize / 2;
-        
-        // Only animate if the position has changed
-        if (targetY !== originalY) {
-          tilesDropped = true;
-          
-          // Disable interactivity during animation
-          tile.disableInteractive();
-          
-          // Animate drop with a bounce effect
-          this.tweens.add({
-            targets: tile,
-            y: targetYPos,
-            duration: 400,
-            ease: 'Bounce.easeOut',
-            onComplete: () => {
-              // Re-enable interactivity after animation
-              tile.setInteractive();
-            }
-          });
-        }
-      });
+
+        tile.disableInteractive();
+
+        this.tweens.add({
+          targets: tile,
+          y: targetYPos,
+          duration: 400,
+          ease: 'Bounce.easeOut',
+          onComplete: () => {
+            tile.setInteractive();
+          }
+        });
+      }
     }
-    
-    return tilesDropped;
   }
 
   fillEmptySpaces() {
     const tileSize = 60;
     const offsetX = (400 - (5 * tileSize)) / 2;
     const offsetY = 180;
-    let filledSpaces = false;
-    
-    // First, collect all empty positions
-    const emptyPositions = [];
+
     for (let y = 0; y < 5; y++) {
+      if (!this.grid[y]) this.grid[y] = [];
+
       for (let x = 0; x < 5; x++) {
-        // Double check if the grid position is actually empty
-        if (!this.grid[y] || !this.grid[y][x]) {
-          emptyPositions.push({ x, y });
+        if (!this.grid[y][x]) {
+          const randomItem = foodItems[Math.floor(Math.random() * foodItems.length)];
+
+          const startY = offsetY - (5 - y) * tileSize - 60;
+
+          const tileContainer = this.add.container(
+            offsetX + x * tileSize + tileSize / 2,
+            startY
+          );
+
+          const tileBg = this.add.rectangle(0, 0, tileSize - 4, tileSize - 4, randomItem.color);
+          tileBg.setStrokeStyle(3, 0x000000);
+          tileBg.setOrigin(0.5);
+
+          const icon = this.add.text(0, 0, randomItem.icon, {
+            fontSize: '36px'
+          }).setOrigin(0.5);
+
+          tileContainer.add([tileBg, icon]);
+
+          tileContainer.setInteractive(
+            new Phaser.Geom.Rectangle(-tileSize/2, -tileSize/2, tileSize, tileSize),
+            Phaser.Geom.Rectangle.Contains
+          );
+
+          tileContainer.gridX = x;
+          tileContainer.gridY = y;
+          tileContainer.itemData = randomItem;
+          tileContainer.bg = tileBg;
+
+          tileContainer.on('pointerdown', () => {
+            this.handleTileClick(tileContainer);
+          });
+
+          this.grid[y][x] = tileContainer;
+
+          const targetY = offsetY + y * tileSize + tileSize / 2;
+
+          tileContainer.disableInteractive();
+
+          this.tweens.add({
+            targets: tileContainer,
+            y: targetY,
+            duration: 500,
+            ease: 'Bounce.easeOut',
+            onComplete: () => {
+              tileContainer.setInteractive();
+            }
+          });
         }
       }
     }
-    
-    // If no empty positions, return early
-    if (emptyPositions.length === 0) {
-      return false;
-    }
-    
-    // Sort positions by Y (top to bottom) to ensure proper filling
-    emptyPositions.sort((a, b) => a.y - b.y);
-    
-    // Process each empty position
-    emptyPositions.forEach((pos, index) => {
-      const { x, y } = pos;
-      
-      // Skip if position is already filled (safety check)
-      if (this.grid[y] && this.grid[y][x]) {
-        console.warn(`Position (${x},${y}) is already filled!`);
-        return;
-      }
-      
-      filledSpaces = true;
-      
-      // Create new tile
-      const randomItem = foodItems[Math.floor(Math.random() * foodItems.length)];
-      
-      // Create a container for the tile
-      const tileContainer = this.add.container(
-        offsetX + x * tileSize + tileSize / 2,
-        offsetY - 100 - (index * 10) // Stagger the starting positions slightly
-      );
-      
-      // Create background for the tile
-      const tileBg = this.add.rectangle(0, 0, tileSize - 4, tileSize - 4, randomItem.color);
-      tileBg.setStrokeStyle(3, 0x000000);
-      tileBg.setOrigin(0.5);
-      
-      // Add emoji icon
-      const icon = this.add.text(0, 0, randomItem.icon, {
-        fontSize: '36px'
-      }).setOrigin(0.5);
-      
-      // Add objects to container
-      tileContainer.add([tileBg, icon]);
-      
-      // Make it interactive
-      tileContainer.setInteractive(
-        new Phaser.Geom.Rectangle(-tileSize/2, -tileSize/2, tileSize, tileSize), 
-        Phaser.Geom.Rectangle.Contains
-      );
-      
-      // Store data
-      tileContainer.gridX = x;
-      tileContainer.gridY = y;
-      tileContainer.itemData = randomItem;
-      tileContainer.bg = tileBg;
-      
-      // Add click event
-      tileContainer.on('pointerdown', () => {
-        this.handleTileClick(tileContainer);
-      });
-      
-      // Store in grid
-      if (!this.grid[y]) this.grid[y] = [];
-      this.grid[y][x] = tileContainer;
-      
-      // Calculate target position
-      const targetY = offsetY + y * tileSize + tileSize / 2;
-      
-      // Animate falling into place
-      const delay = index * 50; // Stagger the animations
-      this.time.delayedCall(delay, () => {
-        this.tweens.add({
-          targets: tileContainer,
-          y: targetY,
-          duration: 500,
-          ease: 'Bounce.easeOut',
-          onComplete: () => {
-            // After all animations, check for new matches (only for the last tile)
-            if (index === emptyPositions.length - 1) {
-              this.time.delayedCall(100, () => {
-                const newMatches = this.findAllMatches();
-                if (newMatches.length > 0) {
-                  this.processMatches(newMatches);
-                } else {
-                  this.isSwapping = false;
-                  this.isProcessing = false;
-                }
-              });
-            }
-          }
-        });
-      });
-    });
-    
-    return filledSpaces;
   }
   
   removeInitialMatches() {
