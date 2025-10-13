@@ -730,8 +730,11 @@ function App() {
         parent: 'game',
         width: 400,
         height: 600,
-        backgroundColor: '#87CEEB', // Sky blue background
+        backgroundColor: '#87CEEB',
         scene: [GameScene],
+        audio: {
+          noAudio: true
+        },
         physics: {
           default: 'arcade',
           arcade: {
