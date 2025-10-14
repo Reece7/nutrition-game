@@ -914,20 +914,16 @@ class GameScene extends Phaser.Scene {
 
   swapTiles(tile1, tile2) {
     this.isSwapping = true;
-    
-    // Reset borders
+
     tile1.bg.setStrokeStyle(3, 0x000000);
     tile2.bg.setStrokeStyle(3, 0x000000);
-    
-    // Store original positions for potential swap back
+
     const originalPos1 = { x: tile1.gridX, y: tile1.gridY };
     const originalPos2 = { x: tile2.gridX, y: tile2.gridY };
-    
-    // Temporarily disable interactivity during swap
+
     tile1.disableInteractive();
     tile2.disableInteractive();
-    
-    // Calculate new positions
+
     const offsetX = (400 - (this.gridSize * this.tileSize)) / 2;
     const offsetY = 150;
 
@@ -936,78 +932,67 @@ class GameScene extends Phaser.Scene {
 
     const newX2 = offsetX + tile1.gridX * this.tileSize + this.tileSize / 2;
     const newY2 = offsetY + tile1.gridY * this.tileSize + this.tileSize / 2;
-    
-    // Update grid positions immediately before animation
-    this.swapGridPositions(tile1, tile2);
-    
-    // Animate the swap
+
     this.tweens.add({
       targets: tile1,
       x: newX1,
       y: newY1,
-      duration: 300,
-      onComplete: () => {
-        // Re-enable interactivity after animation
-        tile1.setInteractive();
-        tile2.setInteractive();
-        
-        // Check for matches after swap
-        const matches = this.findAllMatches();
-        
-        if (matches.length > 0) {
-          this.processMatches(matches);
-        } else {
-          // If no matches, swap back
-          this.swapBack(tile1, tile2, originalPos1, originalPos2);
-        }
-      }
+      duration: 300
     });
-    
+
     this.tweens.add({
       targets: tile2,
       x: newX2,
       y: newY2,
-      duration: 300
+      duration: 300,
+      onComplete: () => {
+        this.swapGridPositions(tile1, tile2);
+
+        tile1.setInteractive();
+        tile2.setInteractive();
+
+        const matches = this.findAllMatches();
+
+        if (matches.length > 0) {
+          this.processMatches(matches);
+        } else {
+          this.swapBack(tile1, tile2);
+        }
+      }
     });
   }
 
-  swapBack(tile1, tile2, originalPos1, originalPos2) {
-    // Disable interactivity during swap back
+  swapBack(tile1, tile2) {
     tile1.disableInteractive();
     tile2.disableInteractive();
 
-    // Calculate original positions
     const offsetX = (400 - (this.gridSize * this.tileSize)) / 2;
     const offsetY = 150;
 
-    const originalX1 = offsetX + originalPos1.x * this.tileSize + this.tileSize / 2;
-    const originalY1 = offsetY + originalPos1.y * this.tileSize + this.tileSize / 2;
+    const targetX1 = offsetX + tile1.gridX * this.tileSize + this.tileSize / 2;
+    const targetY1 = offsetY + tile1.gridY * this.tileSize + this.tileSize / 2;
 
-    const originalX2 = offsetX + originalPos2.x * this.tileSize + this.tileSize / 2;
-    const originalY2 = offsetY + originalPos2.y * this.tileSize + this.tileSize / 2;
-    
-    // Animate swap back
-    const tween1 = this.tweens.add({
+    const targetX2 = offsetX + tile2.gridX * this.tileSize + this.tileSize / 2;
+    const targetY2 = offsetY + tile2.gridY * this.tileSize + this.tileSize / 2;
+
+    this.tweens.add({
       targets: tile1,
-      x: originalX1,
-      y: originalY1,
+      x: targetX1,
+      y: targetY1,
       duration: 300
     });
-    
-    const tween2 = this.tweens.add({
+
+    this.tweens.add({
       targets: tile2,
-      x: originalX2,
-      y: originalY2,
+      x: targetX2,
+      y: targetY2,
       duration: 300,
       onComplete: () => {
-        // Update grid positions after animation completes
         this.swapGridPositions(tile1, tile2);
-        
-        // Re-enable interactivity
+
         tile1.setInteractive();
         tile2.setInteractive();
-        
-        // Reset flags
+
         this.isSwapping = false;
         this.selectedTile = null;
       }
