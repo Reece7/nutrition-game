@@ -11,6 +11,41 @@ const foodItems = [
   { name: 'rice', icon: '🍚', color: 0xffffdd, fact: "Rice gives you energy with carbohydrates." }
 ];
 
+// Level configurations
+const levelConfig = [
+  {
+    level: 1,
+    gridSize: 5,
+    targetScore: 250,
+    maxMoves: 20,
+    objectives: [
+      { type: 'score', target: 100, description: 'Score 100 points' }
+    ]
+  },
+  {
+    level: 2,
+    gridSize: 6,
+    targetScore: 500,
+    maxMoves: 25,
+    objectives: [
+      { type: 'collect', item: 'carrot', target: 5, description: 'Collect 5 carrots' },
+      { type: 'score', target: 200, description: 'Score 200 points' }
+    ]
+  },
+  {
+    level: 3,
+    gridSize: 6,
+    targetScore: 750,
+    maxMoves: 30,
+    objectives: [
+      { type: 'collect', item: 'apple', target: 5, description: 'Collect 5 apples' },
+      { type: 'collect', item: 'fish', target: 5, description: 'Collect 5 fish' },
+      { type: 'score', target: 350, description: 'Score 350 points' }
+    ]
+  }
+  // Add more levels as needed
+];
+
 class GameScene extends Phaser.Scene {
   constructor() {
     super({ key: 'GameScene' });
@@ -20,44 +55,701 @@ class GameScene extends Phaser.Scene {
     this.isProcessing = false;
     this.gridSize = 6;
     this.tileSize = 50;
+    this.isShowingFact = false;
+
+    // New properties for level system
+    this.currentLevel = 0;
+    this.movesLeft = 0;
+    this.objectives = [];
+    this.collectedItems = {};
+    this.stars = 0;
+    this.levelComplete = false;
   }
 
   preload() {
     // Nothing to preload for this prototype
   }
 
+  initLevel(levelIndex) {
+  // Clear any existing game objects
+    this.children.each(child => {
+      if (child !== this.levelText && 
+         child !== this.movesText && 
+         child !== this.scoreText) {
+         child.destroy();
+      }
+    });
+
+    // Reset level state
+    this.grid = [];
+    this.selectedTile = null;
+    this.isSwapping = false;
+    this.isProcessing = false;
+    this.levelComplete = false;
+
+    const level = levelConfig[levelIndex];
+    if (!level) {
+      // No more levels - game completed!
+     this.showGameComplete();
+      return;
+    }
+
+    this.currentLevel = levelIndex;
+    this.gridSize = level.gridSize;
+    this.movesLeft = level.maxMoves;
+    this.objectives = [...level.objectives];
+    this.collectedItems = {};
+    this.levelComplete = false;
+  
+    // Reset the grid
+    this.grid = [];
+  
+    // Clear existing UI
+    if (this.objectivesContainer) {
+        this.objectivesContainer.destroy();
+        this.objectivesContainer = null;
+    }
+  
+    // Recreate background
+    this.createBackground();
+
+    // Update UI
+    this.updateUI();
+  
+    // Create new grid
+    this.createGrid();
+  }
+
+  // updateUI() {
+  //   // Update level display
+  //   if (!this.levelText) {
+  //     this.levelText = this.add.text(20, 40, `Level: ${this.currentLevel + 1}`, 
+  //       { 
+  //         fontSize: '20px', 
+  //         fill: '#fff', 
+  //         backgroundColor: 'rgba(0,0,0,0.7)', 
+  //         padding: { x: 10, y: 5 }
+  //       })
+  //       .setDepth(100);
+  //   } else {
+  //     this.levelText.setText(`Level: ${this.currentLevel + 1}`);
+  //   }
+    
+  //   // Update moves display
+  //   if (!this.movesText) {
+  //     this.movesText = this.add.text(150, 40, `Moves: ${this.movesLeft}`, 
+  //       { 
+  //         fontSize: '20px', 
+  //         fill: '#fff', 
+  //         backgroundColor: 'rgba(0,0,0,0.7)', 
+  //         padding: { x: 10, y: 5 }
+  //       })
+  //       .setDepth(100);
+  //   } else {
+  //     this.movesText.setText(`Moves: ${this.movesLeft}`);
+  //   }
+    
+  //   // Update score display
+  //   if (!this.scoreText) {
+  //     this.scoreText = this.add.text(300, 40, `Score: ${this.score}`, 
+  //       { 
+  //         fontSize: '20px', 
+  //         fill: '#fff', 
+  //         backgroundColor: 'rgba(0,0,0,0.7)', 
+  //         padding: { x: 10, y: 5 }
+  //       })
+  //       .setDepth(100);
+  //   } else {
+  //     this.scoreText.setText(`Score: ${this.score}`);
+  //   }
+  
+  //   // Update objectives display
+  //   if (this.objectivesContainer) {
+  //     this.objectivesContainer.destroy();
+  //   }
+    
+  //   // Calculate container height based on number of objectives
+  //   const containerHeight = Math.max(80, this.objectives.length * 30 + 40);
+    
+  //   // Create objectives container with proper depth
+  //   this.objectivesContainer = this.add.container(20, 80).setDepth(90);
+    
+  //   // Add semi-transparent background
+  //   const bg = this.add.rectangle(
+  //     0, 
+  //     0, 
+  //     360, 
+  //     containerHeight, 
+  //     0xffffff, 
+  //     0.9
+  //   )
+  //   .setOrigin(0)
+  //   .setStrokeStyle(2, 0x000000);
+    
+  //   // Add shadow for depth
+  //   const shadow = this.add.rectangle(
+  //     5, 
+  //     5, 
+  //     360, 
+  //     containerHeight, 
+  //     0x000000, 
+  //     0.2
+  //   )
+  //   .setOrigin(0);
+    
+  //   this.objectivesContainer.add([shadow, bg]);
+    
+  //   // Add title with background
+  //   const titleBg = this.add.rectangle(
+  //     0, 
+  //     0, 
+  //     360, 
+  //     30, 
+  //     0x4a90e2, 
+  //     0.8
+  //   )
+  //   .setOrigin(0);
+    
+  //   const title = this.add.text(
+  //     10, 
+  //     5, 
+  //     'OBJECTIVES', 
+  //     { 
+  //       fontSize: '18px', 
+  //       fill: '#fff', 
+  //       fontStyle: 'bold',
+  //       shadow: {
+  //         offsetX: 1,
+  //         offsetY: 1,
+  //         color: '#000',
+  //         blur: 2,
+  //         stroke: true,
+  //         fill: true
+  //       }
+  //     }
+  //   );
+    
+  //   this.objectivesContainer.add([titleBg, title]);
+    
+  //   // Add objectives with proper spacing
+  //   this.objectives.forEach((obj, index) => {
+  //     const yPos = index * 30 + 35;
+  //     let text = obj.description;
+  //     let completed = false;
+      
+  //     if (obj.type === 'collect') {
+  //       const current = this.collectedItems[obj.item] || 0;
+  //       text = `${obj.description} (${current}/${obj.target})`;
+  //       completed = current >= obj.target;
+  //     } else if (obj.type === 'score') {
+  //       text = `Score ${obj.target} points (${this.score}/${obj.target})`;
+  //       completed = this.score >= obj.target;
+  //     }
+      
+  //     // Add checkmark for completed objectives
+  //     const checkmark = this.add.text(
+  //       10, 
+  //       yPos, 
+  //       completed ? '✓ ' : '○ ', 
+  //       { 
+  //         fontSize: '16px', 
+  //         fill: completed ? '#00aa00' : '#888888'
+  //       }
+  //     );
+      
+  //     const objText = this.add.text(
+  //       30, 
+  //       yPos, 
+  //       text, 
+  //       { 
+  //         fontSize: '16px', 
+  //         fill: completed ? '#00aa00' : '#000000',
+  //         fontStyle: completed ? 'bold' : 'normal'
+  //       }
+  //     );
+      
+  //     // Add progress bar for collect objectives
+  //     if (obj.type === 'collect') {
+  //       const current = this.collectedItems[obj.item] || 0;
+  //       const progress = Math.min(1, current / obj.target);
+  //       const progressBar = this.add.rectangle(
+  //         30,
+  //         yPos + 15,
+  //         300 * progress,
+  //         5,
+  //         completed ? '#00aa00' : '#4a90e2'
+  //       )
+  //       .setOrigin(0, 0.5);
+      
+  //       const progressBg = this.add.rectangle(
+  //         30,
+  //         yPos + 15,
+  //         300,
+  //         5,
+  //         0xdddddd
+  //       )
+  //       .setOrigin(0, 0.5)
+  //       .setDepth(-1);
+        
+  //       this.objectivesContainer.add([progressBg, progressBar]);
+  //     }
+      
+  //     this.objectivesContainer.add([checkmark, objText]);
+  //   });
+  
+  //   // Add rounded corners to the container
+  //   const mask = this.make.graphics();
+  //   mask.fillRoundedRect(0, 0, 360, containerHeight, 10);
+  //   const maskObj = mask.createGeometryMask();
+  //   this.objectivesContainer.setMask(maskObj);
+    
+  //   // Make sure tiles are above the objectives box
+  //   this.children.bringToTop(this.objectivesContainer);
+  // }
+
+  updateUI() {
+    // Get the screen dimensions
+    const { width, height } = this.scale;
+    const isMobile = width < 768; // Check if mobile device
+  
+    // Update level display
+    if (!this.levelText) {
+      this.levelText = this.add.text(
+        isMobile ? 10 : 20, 
+        isMobile ? 10 : 40, 
+        `Level: ${this.currentLevel + 1}`, 
+        { 
+          fontSize: isMobile ? '16px' : '20px', 
+          fill: '#fff', 
+          backgroundColor: 'rgba(0,0,0,0.7)', 
+          padding: { x: 8, y: 4 }
+        }
+      ).setDepth(100);
+    } else {
+      this.levelText.setText(`Level: ${this.currentLevel + 1}`);
+    }
+    
+    // Update moves display
+    if (!this.movesText) {
+      this.movesText = this.add.text(
+        isMobile ? 110 : 150, 
+        isMobile ? 10 : 40, 
+        `Moves: ${this.movesLeft}`, 
+        { 
+          fontSize: isMobile ? '16px' : '20px', 
+          fill: '#fff', 
+          backgroundColor: 'rgba(0,0,0,0.7)', 
+          padding: { x: 8, y: 4 }
+        }
+      ).setDepth(100);
+    } else {
+      this.movesText.setText(`Moves: ${this.movesLeft}`);
+    }
+    
+    // Update score display
+    if (!this.scoreText) {
+      this.scoreText = this.add.text(
+        isMobile ? 220 : 300, 
+        isMobile ? 10 : 40, 
+        `Score: ${this.score}`, 
+        { 
+          fontSize: isMobile ? '16px' : '20px', 
+          fill: '#fff', 
+          backgroundColor: 'rgba(0,0,0,0.7)', 
+          padding: { x: 8, y: 4 }
+        }
+      ).setDepth(100);
+    } else {
+      this.scoreText.setText(`Score: ${this.score}`);
+    }
+    
+    // Update objectives display
+    if (this.objectivesContainer) {
+      this.objectivesContainer.destroy();
+    }
+    
+    // Calculate container dimensions based on screen size
+    const containerWidth = isMobile ? width - 20 : 360;
+    const containerX = isMobile ? 10 : 20;
+    const containerY = isMobile ? 40 : 80;
+    const itemSpacing = isMobile ? 25 : 30;
+    const containerHeight = Math.max(80, this.objectives.length * itemSpacing + 40);
+    
+    // Create objectives container with proper depth
+    this.objectivesContainer = this.add.container(containerX, containerY).setDepth(90);
+    
+    // Add semi-transparent background
+    const bg = this.add.rectangle(
+      0, 
+      0, 
+      containerWidth, 
+      containerHeight, 
+      0x000000, 
+      0.7
+    )
+    .setOrigin(0)
+    .setStrokeStyle(2, 0x4a90e2);
+    
+    this.objectivesContainer.add(bg);
+    
+    // Add title with background
+    const titleBg = this.add.rectangle(
+      0, 
+      0, 
+      containerWidth, 
+      30, 
+      0x4a90e2, 
+      1
+    ).setOrigin(0);
+    
+    const title = this.add.text(
+      10, 
+      5, 
+      'OBJECTIVES', 
+      { 
+        fontSize: isMobile ? '16px' : '18px', 
+        fill: '#fff', 
+        fontStyle: 'bold'
+      }
+    );
+    
+    this.objectivesContainer.add([titleBg, title]);
+    
+    // Add objectives with proper spacing
+    this.objectives.forEach((obj, index) => {
+      const yPos = index * itemSpacing + 35;
+      let text = obj.description;
+      let completed = false;
+      
+      if (obj.type === 'collect') {
+        const current = this.collectedItems[obj.item] || 0;
+        text = `${obj.description} (${current}/${obj.target})`;
+        completed = current >= obj.target;
+      } else if (obj.type === 'score') {
+        text = `Score ${obj.target} points (${this.score}/${obj.target})`;
+        completed = this.score >= obj.target;
+      }
+    
+      // Add checkmark for completed objectives
+      const checkmark = this.add.text(
+        10, 
+        yPos, 
+        completed ? '✓ ' : '○ ', 
+        { 
+          fontSize: isMobile ? '14px' : '16px', 
+          fill: completed ? '#4cff00' : '#ffffff'
+        }
+      );
+      
+      const objText = this.add.text(
+        30, 
+        yPos, 
+        text, 
+        { 
+          fontSize: isMobile ? '14px' : '16px', 
+          fill: completed ? '#4cff00' : '#ffffff',
+          fontStyle: completed ? 'bold' : 'normal'
+        }
+      );
+      
+      // Add progress bar for collect objectives
+      if (obj.type === 'collect') {
+        const current = this.collectedItems[obj.item] || 0;
+        const progress = Math.min(1, current / obj.target);
+        const progressWidth = containerWidth - 40;
+        
+        const progressBar = this.add.rectangle(
+          30,
+          yPos + 15,
+          progressWidth * progress,
+          4,
+          completed ? '#4cff00' : '#4a90e2'
+        ).setOrigin(0, 0.5);
+        
+        const progressBg = this.add.rectangle(
+          30,
+          yPos + 15,
+          progressWidth,
+          4,
+          'rgba(255,255,255,0.3)'
+        ).setOrigin(0, 0.5);
+        
+        this.objectivesContainer.add([progressBg, progressBar]);
+      }
+      
+      this.objectivesContainer.add([checkmark, objText]);
+    });
+    
+    // Make sure tiles are above the objectives box
+    this.children.bringToTop(this.objectivesContainer);
+  }
+
+  checkObjectives() {
+    if (this.levelComplete) return;
+
+    let allCompleted = true;
+    
+    this.objectives.forEach(obj => {
+      if (obj.type === 'collect') {
+        const current = this.collectedItems[obj.item] || 0;
+        if (current < obj.target) {
+          allCompleted = false;
+        }
+      } else if (obj.type === 'score') {
+        if (this.score < obj.target) {
+          allCompleted = false;
+        }
+      }
+    });
+  
+    if (allCompleted) {
+      this.levelComplete = true;
+      this.showLevelComplete();
+    } else if (this.movesLeft <= 0) {
+      this.showLevelFailed();
+    }
+  }
+
+  showLevelComplete() {
+    // Calculate stars (1-3 based on score percentage)
+    const level = levelConfig[this.currentLevel];
+    const scorePercent = Math.min(1, this.score / level.targetScore);
+    const stars = Math.max(1, Math.ceil(scorePercent * 3));
+    this.stars = Math.max(this.stars, stars);
+    
+    // Disable input on the grid
+    this.input.enabled = false;
+
+    // Create a dark overlay
+    const overlay = this.add.rectangle(
+      this.cameras.main.centerX,
+      this.cameras.main.centerY,
+      this.cameras.main.width,
+      this.cameras.main.height,
+      0x000000,
+      0.7
+    ).setDepth(200).setScrollFactor(0);
+
+    // Create popup
+    const popup = this.add.graphics()
+      .fillStyle(0x1a1a1a, 1)
+      .fillRoundedRect(
+        this.cameras.main.centerX - 150,
+        this.cameras.main.centerY - 150,
+        300,
+        300,
+        15
+      )
+      .lineStyle(4, 0x4CAF50)
+      .strokeRoundedRect(
+        this.cameras.main.centerX - 150,
+        this.cameras.main.centerY - 150,
+        300,
+        300,
+        15
+      )
+      .setDepth(201);
+      
+    // Add text
+    const title = this.add.text(
+      this.cameras.main.centerX,
+      this.cameras.main.centerY - 100,
+      'Level Complete!', 
+      { 
+        fontSize: '28px', 
+        fill: '#4CAF50', 
+        fontStyle: 'bold' 
+      }
+    ).setOrigin(0.5).setDepth(202);
+    
+    // Add stars
+    for (let i = 0; i < 3; i++) {
+      this.add.text(
+        this.cameras.main.centerX - 60 + i * 60,
+        this.cameras.main.centerY - 30,
+        i < stars ? '★' : '☆', 
+        { 
+          fontSize: '40px', 
+          fill: i < stars ? '#FFD700' : '#888' 
+        }
+      ).setOrigin(0.5).setDepth(202);
+    }
+    
+    // Add next level button
+    const nextButton = this.add.rectangle(
+      this.cameras.main.centerX,
+      this.cameras.main.centerY + 80,
+      180,
+      50,
+      0x4CAF50
+    )
+    .setInteractive()
+    .on('pointerover', () => nextButton.setFillStyle(0x45a049))
+    .on('pointerout', () => nextButton.setFillStyle(0x4CAF50))
+    .on('pointerdown', () => {
+      this.input.enabled = true;
+      this.initLevel(this.currentLevel + 1);
+      overlay.destroy();
+      popup.destroy();
+      title.destroy();
+      nextButton.destroy();
+      nextButtonText.destroy();
+    })
+    .setDepth(202);
+    
+    const nextButtonText = this.add.text(
+      this.cameras.main.centerX,
+      this.cameras.main.centerY + 80,
+      'Next Level', 
+      { 
+        fontSize: '20px', 
+        fill: '#fff' 
+      }
+    ).setOrigin(0.5).setDepth(203);
+  }
+
+  //   // Create popup
+  //   const popup = this.add.graphics();
+  //   popup.fillStyle(0x000000, 0.7);
+  //   popup.fillRect(50, 150, 300, 250);
+  //   popup.lineStyle(4, 0x4CAF50);
+  //   popup.strokeRect(50, 150, 300, 250);
+    
+  //   // Add text
+  //   const title = this.add.text(200, 180, 'Level Complete!', 
+  //     { fontSize: '28px', fill: '#4CAF50', fontStyle: 'bold' }).setOrigin(0.5);
+      
+  //   // Add stars
+  //   for (let i = 0; i < 3; i++) {
+  //     const star = this.add.text(140 + i * 60, 230, i < stars ? '★' : '☆', 
+  //       { fontSize: '40px', fill: i < stars ? '#FFD700' : '#888' }).setOrigin(0.5);
+  //   }
+    
+  //   // Add next level button
+  //   const nextButton = this.add.rectangle(200, 330, 150, 40, 0x4CAF50)
+  //     .setInteractive()
+  //     .on('pointerover', () => nextButton.setFillStyle(0x45a049))
+  //     .on('pointerout', () => nextButton.setFillStyle(0x4CAF50))
+  //     .on('pointerdown', () => {
+  //       this.initLevel(this.currentLevel + 1);
+  //       popup.destroy();
+  //       title.destroy();
+  //       nextButton.destroy();
+  //       nextButtonText.destroy();
+  //     });
+    
+  //   const nextButtonText = this.add.text(200, 330, 'Next Level', 
+  //     { fontSize: '20px', fill: '#fff' }).setOrigin(0.5);
+  // }
+
+  showLevelFailed() {
+    // Create popup
+    const popup = this.add.graphics();
+    popup.fillStyle(0x000000, 0.7);
+    popup.fillRect(50, 200, 300, 150);
+    popup.lineStyle(4, 0xF44336);
+    popup.strokeRect(50, 200, 300, 150);
+    
+    // Add text
+    const text = this.add.text(200, 250, 'Level Failed!\nTry Again?', 
+      { fontSize: '24px', fill: '#F44336', align: 'center' }).setOrigin(0.5);
+      
+    // Add retry button
+    const retryButton = this.add.rectangle(200, 310, 150, 40, 0xF44336)
+      .setInteractive()
+      .on('pointerover', () => retryButton.setFillStyle(0xd32f2f))
+      .on('pointerout', () => retryButton.setFillStyle(0xF44336))
+      .on('pointerdown', () => {
+        this.initLevel(this.currentLevel);
+        popup.destroy();
+        text.destroy();
+        retryButton.destroy();
+        retryButtonText.destroy();
+      });
+    
+    const retryButtonText = this.add.text(200, 310, 'Retry', 
+      { fontSize: '20px', fill: '#fff' }).setOrigin(0.5);
+  }
+  
+  showGameComplete() {
+    // Create popup
+    const popup = this.add.graphics();
+    popup.fillStyle(0x000000, 0.8);
+    popup.fillRect(50, 150, 300, 200);
+    popup.lineStyle(4, 0x9C27B0);
+    popup.strokeRect(50, 150, 300, 200);
+    
+    // Add text
+    const text = this.add.text(200, 200, 'Game Complete!\nCongratulations!', 
+      { fontSize: '28px', fill: '#9C27B0', align: 'center' }).setOrigin(0.5);
+      
+    // Add menu button
+    const menuButton = this.add.rectangle(200, 280, 150, 40, 0x9C27B0)
+      .setInteractive()
+      .on('pointerover', () => menuButton.setFillStyle(0x7B1FA2))
+      .on('pointerout', () => menuButton.setFillStyle(0x9C27B0))
+      .on('pointerdown', () => {
+        // Restart the game
+        this.scene.restart();
+      });
+      
+    const menuButtonText = this.add.text(200, 280, 'Main Menu', 
+      { fontSize: '20px', fill: '#fff' }).setOrigin(0.5);
+  }
+
   create() {
+    // Clear the scene
+    this.children.removeAll();
+
+    // Set the game dimensions
+    const { width, height } = this.scale;
+    this.isMobile = width < 768;
+
+    // Adjust camera and world bounds
+    this.cameras.main.setViewport(0, 0, width, height);
+    this.physics.world.setBounds(0, 0, width, height);
+
     // Create cartoon-style background
     this.createBackground();
     
     // Create title
-    this.add.text(200, 30, 'Nutrition Match', { 
-      fontSize: '32px', 
+    this.add.text(200, 10, 'Nutrition Match', { 
+      fontSize: '24px', 
       fill: '#ffffff',
       fontStyle: 'bold',
       stroke: '#000000',
-      strokeThickness: 4
-    }).setOrigin(0.5);
+      strokeThickness: 3
+    }).setOrigin(0.5).setDepth(100);
     
     // Create score text
-    this.score = 0;
-    this.scoreText = this.add.text(16, 80, 'Score: 0', { 
-      fontSize: '24px', 
-      fill: '#ffffff',
-      backgroundColor: '#4a90e2',
-      padding: { x: 15, y: 8 },
-      stroke: '#000000',
-      strokeThickness: 3
-    });
+    // this.score = 0;
+    // this.scoreText = this.add.text(16, 80, 'Score: 0', { 
+    //   fontSize: '24px', 
+    //   fill: '#ffffff',
+    //   backgroundColor: '#4a90e2',
+    //   padding: { x: 15, y: 8 },
+    //   stroke: '#000000',
+    //   strokeThickness: 3
+    // });
 
     // Create game grid
-    this.createGrid();
+    //this.createGrid();
+
+    // Initialize score
+    this.score = 0;
+  
+    // Initialize first level
+    this.initLevel(0);
   }
 
   createBackground() {
+    const { width, height } = this.scale;
     // Sky blue background
-    this.add.rectangle(200, 300, 400, 600, 0x87CEEB);
-    
+    //this.add.rectangle(200, 300, 400, 600, 0x87CEEB);
+    this.add.rectangle(0, 0, width, height, 0x87CEEB)
+      .setOrigin(0)
+      .setScrollFactor(0);
+
     // Sun
     const sun = this.add.circle(350, 80, 40, 0xffdd00);
     sun.setStrokeStyle(2, 0xffaa00);
@@ -112,11 +804,19 @@ class GameScene extends Phaser.Scene {
   }
 
   createGrid() {
-    const offsetX = (400 - (this.gridSize * this.tileSize)) / 2;
-    const offsetY = 150;
+    const { width } = this.scale;
+    const offsetX = (width - (this.gridSize * this.tileSize)) / 2;
+    const offsetY = this.isMobile ? 120 : 150;
     
     // Clear existing grid
     this.grid = [];
+
+    // Create a container for the grid
+    if (!this.gridContainer) {
+      this.gridContainer = this.add.container(0, 0).setDepth(50);
+    } else {
+      this.gridContainer.removeAll(true);
+    }
     
     for (let y = 0; y < this.gridSize; y++) {
       this.grid[y] = [];
@@ -127,7 +827,7 @@ class GameScene extends Phaser.Scene {
         const tileContainer = this.add.container(
           offsetX + x * this.tileSize + this.tileSize / 2,
           offsetY + y * this.tileSize + this.tileSize / 2
-        );
+        ).setDepth(50);
 
         // Create background for the tile (rounded rectangle)
         const tileBg = this.add.rectangle(0, 0, this.tileSize - 4, this.tileSize - 4, randomItem.color);
@@ -158,6 +858,7 @@ class GameScene extends Phaser.Scene {
         
         // Store in grid
         this.grid[y][x] = tileContainer;
+        this.gridContainer.add(tileContainer);
       }
     }
     
@@ -166,8 +867,9 @@ class GameScene extends Phaser.Scene {
   }
 
   handleTileClick(tile) {
-    // Don't allow interaction during animations or if already processing
-    if (this.isSwapping || this.isProcessing) return;
+    // Don't allow interaction during animations, processing, or if level is complete
+    if (this.isSwapping || this.isProcessing || this.levelComplete) return;
+
     
     // If no tile is selected yet
     if (!this.selectedTile) {
@@ -421,47 +1123,216 @@ class GameScene extends Phaser.Scene {
     return matches;
   }
 
+  // processMatches(matches) {
+  //   this.isProcessing = true;
+
+  //   // Update score
+  //   this.score += matches.length * 10;
+  //   this.scoreText.setText('Score: ' + this.score);
+
+  //   // // Show nutrition fact for one of the matched tiles with glass effect
+  //   // if (matches.length > 0) {
+  //   //   const glassBg = this.add.rectangle(200, 300, 350, 150, 0xffffff);
+  //   //   glassBg.setAlpha(0.85);
+  //   //   glassBg.setStrokeStyle(2, 0x000000);
+
+  //   //   const shadow = this.add.rectangle(205, 305, 350, 150, 0x000000);
+  //   //   shadow.setAlpha(0.3);
+  //   //   shadow.setDepth(1000);
+
+  //   //   glassBg.setDepth(1001);
+
+  //   //   const factText = this.add.text(200, 300, matches[0].itemData.fact, {
+  //   //     fontSize: '20px',
+  //   //     fill: '#000000',
+  //   //     wordWrap: { width: 300 },
+  //   //     align: 'center',
+  //   //     fontStyle: 'bold'
+  //   //   }).setOrigin(0.5);
+
+  //   //   factText.setDepth(1002);
+
+  //   //   const textBg = this.add.rectangle(200, 300, 310, 110, 0xffffff, 0);
+  //   //   textBg.setStrokeStyle(1, 0x000000);
+  //   //   textBg.setDepth(1001);
+
+  //   //   this.time.delayedCall(2500, () => {
+  //   //     shadow.destroy();
+  //   //     glassBg.destroy();
+  //   //     factText.destroy();
+  //   //     textBg.destroy();
+  //   //   });
+  //   // }
+
+  //   const bubbleWidth = 350;
+  //   const bubbleHeight = 100;  // Reduced height for better fit
+  //   const bubbleX = 200;  // Center of the screen
+  //   const bubbleY = 500;  // Position at the bottom of the screen
+
+  //   // Create chat bubble tail
+  //   const bubbleTail = this.add.triangle(
+  //     bubbleX, bubbleY - bubbleHeight/2 + 5,  // Position above the bubble
+  //     0, 15,  // Point down (width, height)
+  //     15, 15,  // Base point 1
+  //     7.5, 0,  // Tip point
+  //     0xffffff  // White color
+  //   ).setOrigin(0.5, 0).setAlpha(0.85).setDepth(1001);
+
+  //   // Create bubble background with rounded corners
+  //   const bubbleBg = this.add.graphics();
+  //   bubbleBg.fillStyle(0xffffff, 0.9);
+  //   bubbleBg.lineStyle(2, 0x000000);
+  //   bubbleBg.fillRoundedRect(
+  //     bubbleX - bubbleWidth/2, 
+  //     bubbleY - bubbleHeight/2, 
+  //     bubbleWidth, 
+  //     bubbleHeight, 
+  //     15  // Corner radius
+  //   );
+  //   bubbleBg.strokeRoundedRect(
+  //     bubbleX - bubbleWidth/2, 
+  //     bubbleY - bubbleHeight/2, 
+  //     bubbleWidth, 
+  //     bubbleHeight, 
+  //     15  // Corner radius
+  //   );
+  //   bubbleBg.setDepth(1000);
+
+  //   // Create the fact text
+  //   const factText = this.add.text(
+  //     bubbleX, 
+  //     bubbleY - 10,  // Slight adjustment for better centering
+  //     matches[0].itemData.fact, 
+  //     {
+  //       fontSize: '16px',
+  //       fill: '#000000',
+  //       wordWrap: { width: 320 },  // Slightly wider for better text flow
+  //       align: 'center',
+  //       fontStyle: 'bold',
+  //       padding: { top: 5, bottom: 5, left: 10, right: 10 }  // Add some padding
+  //     }
+  //   ).setOrigin(0.5, 0.5).setDepth(1002);
+
+  //   // Remove after delay
+  //   this.time.delayedCall(2500, () => {
+  //     bubbleBg.destroy();
+  //     factText.destroy();
+  //     bubbleTail.destroy();
+  //   });
+
+  //   matches.forEach(tile => {
+  //     this.grid[tile.gridY][tile.gridX] = null;
+
+  //     this.tweens.add({
+  //       targets: tile,
+  //       scale: 0,
+  //       alpha: 0,
+  //       duration: 300,
+  //       ease: 'Power2',
+  //       onComplete: () => {
+  //         tile.destroy();
+  //       }
+  //     });
+  //   });
+
+  //   this.time.delayedCall(350, () => {
+  //     this.dropTiles();
+  //     this.time.delayedCall(450, () => {
+  //       this.fillEmptySpaces();
+  //       this.time.delayedCall(600, () => {
+  //         const newMatches = this.findAllMatches();
+  //         if (newMatches.length > 0) {
+  //           this.processMatches(newMatches);
+  //         } else {
+  //           this.isSwapping = false;
+  //           this.isProcessing = false;
+  //           this.checkForPossibleMoves();
+  //         }
+  //       });
+  //     });
+  //   });
+  // }
+
   processMatches(matches) {
     this.isProcessing = true;
+
+    // Track collected items
+    matches.forEach(tile => {
+     const itemName = tile.itemData.name;
+     this.collectedItems[itemName] = (this.collectedItems[itemName] || 0) + 1;
+    });    
+
+    // Update moves and check objectives if it was a valid move
+    if (matches.length > 0) {
+     this.movesLeft--;
+      this.updateUI();
+      this.checkObjectives();
+    }
 
     // Update score
     this.score += matches.length * 10;
     this.scoreText.setText('Score: ' + this.score);
 
-    // Show nutrition fact for one of the matched tiles with glass effect
-    if (matches.length > 0) {
-      const glassBg = this.add.rectangle(200, 300, 350, 150, 0xffffff);
-      glassBg.setAlpha(0.85);
-      glassBg.setStrokeStyle(2, 0x000000);
+    // Show nutrition fact in chat bubble (only if not already showing one)
+    if (!this.isShowingFact && matches.length > 0) {
+      this.isShowingFact = true;
+    
+      const bubbleWidth = 350;
+      const bubbleHeight = 100;
+      const bubbleX = 200;
+      const bubbleY = 500;
 
-      const shadow = this.add.rectangle(205, 305, 350, 150, 0x000000);
-      shadow.setAlpha(0.3);
-      shadow.setDepth(1000);
+      // Create chat bubble tail
+      const bubbleTail = this.add.triangle(
+        bubbleX, bubbleY - bubbleHeight/2 + 5,
+        0, 15, 15, 15, 7.5, 0, 0xffffff
+      ).setOrigin(0.5, 0).setAlpha(0.85).setDepth(1001);
 
-      glassBg.setDepth(1001);
+      // Create bubble background
+      const bubbleBg = this.add.graphics();
+      bubbleBg.fillStyle(0xffffff, 0.9);
+      bubbleBg.lineStyle(2, 0x000000);
+      bubbleBg.fillRoundedRect(
+        bubbleX - bubbleWidth/2, 
+        bubbleY - bubbleHeight/2, 
+        bubbleWidth, 
+        bubbleHeight, 
+        15
+      );
+      bubbleBg.strokeRoundedRect(
+        bubbleX - bubbleWidth/2, 
+        bubbleY - bubbleHeight/2, 
+        bubbleWidth, 
+        bubbleHeight, 
+        15
+      );
+      bubbleBg.setDepth(1000);
 
-      const factText = this.add.text(200, 300, matches[0].itemData.fact, {
-        fontSize: '20px',
-        fill: '#000000',
-        wordWrap: { width: 300 },
-        align: 'center',
-        fontStyle: 'bold'
-      }).setOrigin(0.5);
+      // Create the fact text
+      const factText = this.add.text(
+        bubbleX, 
+        bubbleY - 10,
+        matches[0].itemData.fact, 
+        {
+          fontSize: '16px',
+          fill: '#000000',
+          wordWrap: { width: 320 },
+          align: 'center',
+          fontStyle: 'bold',
+          padding: { top: 5, bottom: 5, left: 10, right: 10 }
+        }
+      ).setOrigin(0.5, 0.5).setDepth(1002);
 
-      factText.setDepth(1002);
-
-      const textBg = this.add.rectangle(200, 300, 310, 110, 0xffffff, 0);
-      textBg.setStrokeStyle(1, 0x000000);
-      textBg.setDepth(1001);
-
+      // Remove after delay
       this.time.delayedCall(2500, () => {
-        shadow.destroy();
-        glassBg.destroy();
+        bubbleBg.destroy();
         factText.destroy();
-        textBg.destroy();
+        bubbleTail.destroy();
+        this.isShowingFact = false; // Reset the flag when done
       });
     }
 
+    // Process matched tiles
     matches.forEach(tile => {
       this.grid[tile.gridY][tile.gridX] = null;
 
@@ -477,6 +1348,7 @@ class GameScene extends Phaser.Scene {
       });
     });
 
+    // Process board updates
     this.time.delayedCall(350, () => {
       this.dropTiles();
       this.time.delayedCall(450, () => {
@@ -488,7 +1360,9 @@ class GameScene extends Phaser.Scene {
           } else {
             this.isSwapping = false;
             this.isProcessing = false;
-            this.checkForPossibleMoves();
+            if (!this.levelComplete) {
+              this.checkForPossibleMoves();
+            }
           }
         });
       });
