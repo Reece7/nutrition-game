@@ -563,16 +563,18 @@ class GameScene extends Phaser.Scene {
     ).setOrigin(0.5).setDepth(202);
     
     // Add stars
+    const starTexts = [];
     for (let i = 0; i < 3; i++) {
-      this.add.text(
+      const starText = this.add.text(
         this.cameras.main.centerX - 60 + i * 60,
         this.cameras.main.centerY - 30,
-        i < stars ? '★' : '☆', 
-        { 
-          fontSize: '40px', 
-          fill: i < stars ? '#FFD700' : '#888' 
+        i < stars ? '★' : '☆',
+        {
+          fontSize: '40px',
+          fill: i < stars ? '#FFD700' : '#888'
         }
       ).setOrigin(0.5).setDepth(202);
+      starTexts.push(starText);
     }
     
     // Add next level button
@@ -583,7 +585,7 @@ class GameScene extends Phaser.Scene {
       50,
       0x4CAF50
     )
-    .setInteractive()
+    .setInteractive({ useHandCursor: true })
     .on('pointerover', () => nextButton.setFillStyle(0x45a049))
     .on('pointerout', () => nextButton.setFillStyle(0x4CAF50))
     .on('pointerdown', () => {
@@ -594,18 +596,21 @@ class GameScene extends Phaser.Scene {
       title.destroy();
       nextButton.destroy();
       nextButtonText.destroy();
+      starTexts.forEach(star => star.destroy());
     })
     .setDepth(202);
-    
+
     const nextButtonText = this.add.text(
       this.cameras.main.centerX,
       this.cameras.main.centerY + 80,
-      'Next Level', 
-      { 
-        fontSize: '20px', 
-        fill: '#fff' 
+      'Next Level',
+      {
+        fontSize: '20px',
+        fill: '#fff'
       }
-    ).setOrigin(0.5).setDepth(203);
+    ).setOrigin(0.5).setDepth(202);
+
+    nextButtonText.setInteractive(false);
   }
 
   //   // Create popup
